@@ -1,0 +1,478 @@
+---
+title: "Southern California greem turtle projects permit report"
+output: word_document
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+rm(list=ls())
+
+# bring in some results data files from Cm_SDB_CMR and Cm_SealBeach directories. 
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(reshape2)
+library(ggplot2)
+library(RMark)
+library(ggridges)
+
+SE <- function(x) sqrt(var(x, na.rm = TRUE)/sum(!is.na(x)))
+# The date SD_Bay_Report.R and SealBeach_Report.R (in Cm_SealBeach directory) were run. They should be run
+# on the same day. 
+run.date <- "2019-10-08"
+
+# SDB data
+col_def_SDB <- cols(Turtle_ID = col_integer(),
+                    PIT_LFF = col_factor(),
+                    PIT_RFF = col_factor(),
+                    Tag_LFF = col_factor(),
+                    Tag_RFF = col_factor(),
+                    Date = col_date(format = "%Y-%m-%d"),
+                    Dead = col_integer(),
+                    Sex = col_factor(levels = c("F", "M", "U")),
+                    Weight = col_double(),
+                    SCL = col_double(),
+                    SCW = col_double(),
+                    CCL = col_double(),
+                    CCW = col_double(),
+                    Oxytet = col_double(),
+                    Blood = col_integer(),
+                    Skin = col_integer(),
+                    Haplo = col_factor())
+
+turtle.haplo.SDB <- read_csv(file = paste0("data/SDB_report_", run.date, ".csv"),
+                             col_types = col_def_SDB)
+
+col_def_SB <- cols(Turtle_ID = col_integer(),
+                   Date = col_date(format = "%Y-%m-%d"),
+                   PIT_LFF = col_factor(),
+                   PIT_RFF = col_factor(),
+                   Tag_LFF = col_factor(),
+                   Tag_RFF = col_factor(),
+                   Sex = col_factor(levels = c("F", "M", "U")),
+                   Weight = col_double(),
+                   SCL = col_double(),
+                   SCW = col_double(),
+                   CCL = col_double(),
+                   CCW = col_double(),
+                   Oxytet = col_double(),
+                   Blood = col_factor(),
+                   Skin = col_factor(),
+                   Sat_Tags = col_integer(),
+                   Sat_Max_Tag = col_integer(),
+                   Haplo = col_factor())
+
+turtle.haplo.SB <- read_csv(file = paste0("~/R/Cm_SealBeach/data/SB_report_", 
+                                          run.date, ".csv"),
+                            col_types = col_def_SB)
+
+reporting.date.begin <- as.Date("2018-10-01")
+reporting.date.end <- as.Date("2019-09-30")
+
+turtle.haplo.SDB %>%
+  mutate(SCL.regress = ifelse(is.na(SCL) & !is.na(CCL), 1, 0),
+         CCL.regress = ifelse(is.na(CCL) & !is.na(SCL), 1, 0),
+         Mass.regress = ifelse(is.na(Weight) & !is.na(SCL), 1, 0),
+         SCL = ifelse(SCL.regress == 1,
+                      (CCL - 0.64)/1.06, SCL),
+         CCL = ifelse(CCL.regress == 1,
+                      0.64 + 1.06 * SCL, CCL),
+         Weight = ifelse(Mass.regress == 1,
+                         exp(0.96 + 0.04 * SCL),
+                         Weight)) -> turtle.haplo.SDB
+
+turtle.haplo.SDB %>%  group_by(Turtle_ID) %>%
+  mutate(n = n()) %>%
+  filter(Date >= reporting.date.begin &
+           Date <= reporting.date.end) %>%
+  arrange(Date) -> new.captures.SDB
+
+new.captures.SDB %>% group_by(Turtle_ID) %>%
+  summarise(PIT_LFF = first(PIT_LFF),
+            PIT_RFF = first(PIT_RFF),
+            Sex = first(Sex),
+            CCL = first(CCL),
+            Weight = first(Weight),
+            SCL = first(SCL), 
+            Date = first(Date)) %>%
+  arrange(Date) -> unique.new.captures.SDB
+
+# something isn't working here... there are 10 turtles that come
+# back with the filtering below - these are not new turtles!
+new.captures.SDB %>% filter(n == 1) -> new.turtles.SDB 
+
+turtle.haplo.SB %>%
+  mutate(SCL.regress = ifelse(is.na(SCL) & !is.na(CCL), 1, 0),
+         CCL.regress = ifelse(is.na(CCL) & !is.na(SCL), 1, 0),
+         Mass.regress = ifelse(is.na(Weight) & !is.na(SCL), 1, 0),
+         SCL = ifelse(SCL.regress == 1,
+                      (CCL - 0.64)/1.06, SCL),
+         CCL = ifelse(CCL.regress == 1,
+                      0.64 + 1.06 * SCL, CCL),
+         Weight = ifelse(Mass.regress == 1,
+                         exp(0.96 + 0.04 * SCL),
+                         Weight)) -> turtle.haplo.SB
+
+turtle.haplo.SB %>% group_by(Turtle_ID) %>%
+  mutate(n = n()) %>%
+  filter(Date >= reporting.date.begin &
+           Date <= reporting.date.end) %>%
+  arrange(Date) -> new.captures.SB
+
+new.captures.SB %>% group_by(Turtle_ID) %>%
+  summarise(PIT_LFF = first(PIT_LFF),
+            PIT_RFF = first(PIT_RFF),
+            Sex = first(Sex),
+            CCL = first(CCL),
+            Weight = first(Weight),
+            SCL = first(SCL),
+            Date = first(Date)) %>%
+  arrange(Date) -> unique.new.captures.SB
+
+new.captures.SB %>% filter(n == 1) -> new.turtles.SB 
+
+```
+
+# 1. What progress did you make toward meeting your objectives this year? Summarize what you did and if and how you met your objectives. List citations for any reports, publications, and presentations from this reporting period. We may request electronic copies. 
+
+## Research Summary
+Under NMFS Scientific Research Permit 18238 during this reporting period, we conducted field operations at two foraging grounds of the east Pacific green turtle (*Chelonia mydas*): San Diego Bay (SDB) and Seal Beach National Wildlife Refuge (SBNWR).  At the both locations, biological and morphological data (lengths, mass and body depth) were collected and recorded on each of the captured animals.  Animals were checked for existing Inconel and passive integrated transponder (PIT) tags and new animals received both an inconel flipper tag and a PIT tag.  Skin samples for genetics and/or stable isotope analysis were collected from each of the animals and blood for hormone and potential contaminant analysis was collected from a majority of the animals.  Oxytetracycline was injected to all turtles that were caught the first time for the future aging and growth studies (NMFS SEFSC Sea Turtle Research Techniques Manual; 25 mg/kg with oxytetracycline concentration of 200 mg/ml).  Esophageal lavage was not conducted.  
+ 
+### San Diego Bay
+#### Summary
+During the permit reporting year, ```r length(unique(new.captures.SDB$Date))``` field operations were conducted in San Diego Bay between ```r min(new.captures.SDB$Date)``` and ```r max(new.captures.SDB$Date)```, during which a total of ```r nrow(new.captures.SDB)``` green turtle interactions occured.  
+
+Of the ```r nrow(new.captures.SDB)``` interactions (```r length(unique(new.captures.SDB$Turtle_ID))``` unique turtles), ```r nrow(filter(unique.new.captures.SDB, Sex == "F"))``` were classified as females, ```r nrow(filter(unique.new.captures.SDB, Sex == "M"))``` was classified as a male, and ```r nrow(filter(new.captures.SDB, Sex == "U"))``` were juveniles with unknown sex (Table 1), based upon the mean nesting size of east Pacific green turtles.   Among the ```r length(unique(new.captures.SDB$Turtle_ID))``` unique turtles,  ```r nrow(new.turtles.SDB) ``` were new animals not previously captured (See Table 1 with *).  Long-term recaptures are important indicators that San Diego Bay is a well-established foraging ground for juvenile through adult life stages.  Capturing new juveniles suggests that animals continue to recruit into San Diego Bay.
+
+```{r echo=FALSE}
+new.captures.SDB %>% select(Turtle_ID, Date, Sex, Weight, CCL, SCL) %>%
+  arrange(by = Date) -> new.captures.SDB.table
+
+knitr::kable(new.captures.SDB.table, digits = 1,
+             caption = paste0("Table 1. Summary of green turtle interactions in San Diego Bay from ", 
+                              min(new.captures.SDB$Date), " to ",  max(new.captures.SDB$Date), "."))
+```
+
+#### Capture-recapture for abundance estimation
+During a portion of this reporting period (2018-10-01 to 2019-09-30), we conducted a short-term intense capture-recapture effort from 2019-05-07 to 2019-06-26 so that we can estimate abundance of green turtles in San Diego Bay assuming no deaths, immigration, and emigration occurred during the period. 
+
+Green turtles were caught with entanglement nets (50-100m length × 8m depth, mesh size = 40 cm stretched).  The entanglement nets used in this study have been used to capture the smallest of post-pelagic juvenile turtles at other green turtle foraging areas in Mexico (SCL ≥ 35 cm; Seminoff et al. 2003) as well as in SDB in the past (SCL ≥ 44.0 cm; Eguchi et al. 2010).  We therefore assumed that all size classes of green turtles living in SDB would be caught by these nets.  Exact locations of nets were dictated by tidal height, which restricted access to some areas during a low tide.  All nets were deployed from Boston whalers (approximately 5 m in length) with a 75-hp or 25-hp outboard motor.  The distance of the nets from the shore ranged from approximately 10 to 100 m, whereas water depths ranged from <1 to 6 m. Deployment time and latitude and longitude coordinates of two ends and the center of each deployed net were determined using a Global Positioning System (GPS) on a mobile phone.  
+
+Capture effort was conducted during late afternoon and evening. Both boats remained near deployed nets in order to maintain close attentions to turtles and other animals that might be caught in the nets. Nets were checked at least every 45 minutes. When a turtle was found in a net, it was broght onboard, disentangled, and checked for existing tags (flipper and passive integrated transponder (PIT) tags).  If no tag was present, new tags were applied.  Curved carapace length (CCL) were measured from the nuchal notch to the posterior-most portion of the rear marginal scutes, whereas curved carapace width (CCW) was measured at the widest part of the carapace using a fiberglass measuring tape. Standard carapace length (SCL) and width (SCW) were measured using a caliper.  Turtles were kept onboard until all the nets were extracted to avoid recaptures of the same turtles during the evening 
+
+##### Statistical analyses
+Capture-recapture data were fitted to several statistical models to estimate abundance. We used maximum likelihood (ML) and Bayesian approaches. All models included capture probabilities (p), which were assumed constant (p(.)) or varying with capture occasions (p(t)).  For the ML approach, we considered "closed" and "Huggins' closed" models. The difference between the two groups of models is that models in the closed models explicitly include the number of unobserved turtles as a parameter, whereas those in Huggins' models do not. Huggins' approach, unlike the closed models, can accommodate individual covaraites.  We considered effects of capture occasions and body size (continuous or discrete categories) on capture probabilties. Models were compared within each group, i.e., closed or Huggins', using AICc. The most parsimonious model was used for abundance estimation. The appropriateness of the best model was determined through goodness of fit tests using U-CARE software via R2Ucare package (v. 1.0.0, Gimenez et al. 2017). 
+
+For the Bayesian approach, effects of capture occasions, behavior, and variability among individuals (individual heterogeneity) on capture probability were considered.  For the individual heterogeneity model, we assumed the capature probability among individual was normally distributed in the logit scale, which was a common assumption for capture heterogeneity models (Kery and Schaub 2012).  For all models, we used the data-augmentation approach of Royle and Dorazio (2008).   We used vague priors for all parameters. We ran 5 independent chains of 50000 steps as a burn-in sample, which was followed by 10000 steps for posterior samples. These posterior samples were used to compute parameter estimates.  Numerical convergence of each analysis was determined using Gelman-Rubin statistic (Gelman et al. 2014). Models were compared using deviance information criteria (DIC, Spiegelhalter 2002).  
+
+The best estimates from two groups of the ML approach and the best estimate from the Bayesian approach were compared using the precisions of the estimates. We provide all estimates but use the most precise estimate (narrowest 95% confidence or credible interval) as our best estimate of abundance of green turtles in the south part of San Diego Bay during early summer of 2019.
+
+All statistical analyses were conducted using the R Statistical Language (v.3.6.1; R core team 2019). The ML analyses were conducted using Mark (available from http://www.phidot.org) through RMark (v. 2.2.6, Laake 2013), whereas the Bayesian analysis was conducted using JAGS (v. 4.3, Plummer 2018) through rjags (v. 4.8, Plummer 2018) in R. 
+
+#### Results 
+##### Field sampling
+```{r results1, include = F, echo = FALSE, message=FALSE}
+# this file is from Cm_SDB_CMR directory.
+
+# BRING IN SIZE DATA FOR THE SAMPLING. SCL, CCL, ETC.
+# this file was created using extract_data_TurtleDB.R. See the script for 
+# details - connect to the database using ODBC
+dat.size <- read_csv(file = 'data/CMR2019_size_data_2019-09-23.csv')
+
+CH <- select(dat.size, -c("ID", "CCL_cm"))
+
+#capt.hist <- data.frame(ch = pasty(CH))
+
+n.turtles <- nrow(dat.size) #colSums(dat0[, 2:ncol(dat0)])
+n.captures <- rowSums(CH)
+
+```
+
+At least one turtle was caught on ```r ncol(CH)``` days from 2019-05-07 to 2019-06-26.
+We caught a total of ```r sum(n.captures)``` turtles (```r nrow(dat.size)``` unique turtles). The maximum number of turtles caught per day was ```r max(colSums(CH))``` (mean = ```r signif(mean(colSums(CH)), digits = 2)```, SE = ```r signif(SE(colSums(CH)), digits = 2)```).  The number of captures per turtle ranged from 1 to ```r max(n.captures)``` (mean = ```r signif(mean(n.captures), digits = 2)```, SE = ```r signif(SE(n.captures), digits = 2)```).  The CCL of these turtles ranged from ```r min(dat.size$CCL_cm)``` to ```r max(dat.size$CCL_cm)``` cm (mean = ```r signif(mean(dat.size$CCL_cm), digits = 3)```, SE = ```r signif(SE(dat.size$CCL_cm), digits = 2)```).  
+
+##### Statistical analysis
+Capture and non-capture of the ```r nrow(dat.size)``` turtles during the study period were used to estimate the total abundance within the south SDB. We used curved carapace length (CCL) as an individual-covariate in Huggins' models that potentially affected the capture probabilities. CCL was used as a continuous variable or binary categorical variables, where the effect of cut off value was compared among 70, 80, and 90 cm. In the categorical approaches, two capture probabilities were assumed; one for those turtles that are smaller than a cutoff CCL and the other for those larger.  These models are indicated as size_cat1 (70cm), size_cat2 (80 cm), or size_cat3 (90 cm). 
+
+```{r RMark_1, include = F, echo=F, message=F, cache=TRUE}
+# load results from the most recent run here:
+load('RData/Mark_Analysis_output_2019-09-24.RData')
+
+closed.model.table <- arrange(model.list.closed$model.table, 
+                              rownames(model.list.closed$model.table))
+
+closed.Nhats <- data.frame(model = closed.model.table$model,
+                           AICc = closed.model.table$AICc,
+                           weight = closed.model.table$weight,
+                           Nhat = unlist(lapply(model.list.closed, 
+                                                function(x) x$results$derived$`N Population Size`$estimate)),
+                           se = unlist(lapply(model.list.closed, 
+                                                function(x) x$results$derived$`N Population Size`$se)),
+                           lcl = unlist(lapply(model.list.closed, 
+                                                function(x) x$results$derived$`N Population Size`$lcl)),
+                           ucl = unlist(lapply(model.list.closed, 
+                                                function(x) x$results$derived$`N Population Size`$ucl))) %>%
+  arrange(by = AICc) %>%
+  mutate(DeltaAIC = AICc - min(AICc)) %>%
+  select(-AICc)
+
+Huggins.model.table <- arrange(model.list.Huggins$model.table, 
+                               rownames(model.list.Huggins$model.table))
+Huggins.Nhats <- data.frame(model = Huggins.model.table$model,
+                           AICc = Huggins.model.table$AICc,
+                           weight = Huggins.model.table$weight,
+                           Nhat = unlist(lapply(model.list.Huggins, 
+                                                function(x) x$results$derived$`N Population Size`$estimate)),
+                           se = unlist(lapply(model.list.Huggins, 
+                                                function(x) x$results$derived$`N Population Size`$se)),
+                           lcl = unlist(lapply(model.list.Huggins, 
+                                                function(x) x$results$derived$`N Population Size`$lcl)),
+                           ucl = unlist(lapply(model.list.Huggins, 
+                                                function(x) x$results$derived$`N Population Size`$ucl))) %>%
+  arrange(by = AICc) %>%
+  mutate(DeltaAIC = AICc - min(AICc)) %>%
+  select(-AICc)
+
+
+```
+
+
+```{r closed_model_table, echo=FALSE, message=FALSE}
+knitr::kable(closed.Nhats, 
+             digits = 1,
+             caption = "Table 2. A comparison of two closed models that were fitted to capture-recapture histories of green turtles in San Diego Bay during the abundance-estimation study in 2019. p = capture/recapture probability, N = abundance. p(1) and N(1) indicate constant over time.")
+
+```
+
+
+```{r Huggins_model_table, echo=FALSE, message=FALSE}
+knitr::kable(Huggins.Nhats, 
+             digits = 1,
+             caption = "Table 3. A comparison of six Huggins' closed models that were fitted to capture-recapture histories of green turtles in San Diego Bay during the abundance-estimation study in 2019. p = capture/recapture probability. size_cat1, size_cat2, and size_cat3 indicate binary categorical variables, where CCL was grouped by cutoff values of 70, 80, and 90 cm, respectively.")
+
+```
+
+                              
+```{r model_averaging, echo=FALSE, message=FALSE}
+# model average the abundance estimates: 
+# code from here: http://www.phidot.org/forum/viewtopic.php?f=21&t=952 
+# Thanks Jeff Laake!
+
+# model average Nhat value
+num.models <- nrow(model.list.Huggins$model.table)
+estimate <- vector("numeric",length=num.models)
+se <- vector("numeric",length=num.models)
+# The actual model number is the row number for the model.table
+model.numbers <- as.numeric(row.names(model.list.Huggins$model.table))
+
+for(i in 1:num.models){
+  # For each model extract the derived parameter valuess and their se
+  x <- model.list.Huggins[[model.numbers[i]]]$results$derived
+  estimate[i] <- x$`N Population Size`$estimate
+  se[i] <- x$`N Population Size`$se
+}
+
+# Call model.average using the list structure which includes estimate, weight and vcv list in this case
+Nhat.Huggins.avg <- model.average(list(estimate = estimate,
+                                       weight=model.list.Huggins$model.table$weight,
+                                       se=se))
+
+```
+
+Goodness of fit tests indicated that the closed model was appropriate for the data where no significant departure from the expected numbers of recaptures was found (results not shown). No goodness of fit tests were available for Huggins' closed models. 
+
+For the closed model approach, the time-independent capture probability model (p(.)) was considered the most parsimonious according to AICc values (Table 2). Estimated abundance from the model was ```r signif(Nhat.closed[[1]]$estimate, 3)``` (SE = ```r signif(Nhat.closed[[1]]$se, digits = 3)```, 95% CI = [```r signif(Nhat.closed[[1]]$lcl, digits = 3)``` - ```r signif(Nhat.closed[[1]]$ucl, digits = 3)```]). 
+
+For the Huggins' closed models, the model with capture probabilities defined for >= 80 cm CCL and < 80 cm CCL (size_cat2) was the most parsimonious model (Table 3).  The top 5 models, however, were within deltaAIC < 2.0, indicating that they were all acceptable The estimated abundance from the most parsimonious Huggins' closed model (p(size.cat2) was ```r signif(Huggins.Nhats[1, "Nhat"], digits = 3)``` (SE = ```r signif(Huggins.Nhats[1, "se"], digits = 3)```, 95% CI = [```r signif(Huggins.Nhats[1, "lcl"], digits = 3)``` - ```r signif(Huggins.Nhats[1, "ucl"], digits = 3)```]).  When all five acceptable models were used in a model averaging method (Burnham and Anderson 1998), the estimated abundance was ```r signif(Nhat.Huggins.avg$estimate, 3)``` (SE = ```r signif(Nhat.Huggins.avg$se, 3)```, 95% CI = [```r signif(Nhat.Huggins.avg$estimate - 2 * Nhat.Huggins.avg$se, 3)``` - ```r signif(Nhat.Huggins.avg$estimate + 2 * Nhat.Huggins.avg$se, 3)```]).
+
+```{r Bayes_1, include = F, echo=F, message=F, cache=TRUE}
+# rather than running the whole thing, load the results from the most recent run:
+Bayes.out <- readRDS(file = 'RData/Bayes_Analysis_output_2019-09-24.rds')
+Bayes.out$summary$DeltaDIC <- Bayes.out$summary$DIC - min(Bayes.out$summary$DIC)
+```
+
+For the Bayesian approach, the individual random effects model (Mh) was the best model according to the deviance information criteria (DIC; Table 4). The estimated abundance (mean) was ```r signif(Bayes.out$summary[1, 'N'], digits = 3)``` (95% PI = [```r Bayes.out$summary[1, 'N_lcl']``` - ```r Bayes.out$summary[1, 'N_ucl']```]).  The point estimate from the Mh was significantly greater than those from the non-Bayesian approach (closed and Huggins' closed models).   
+
+```{r Bayes_table, include=FALSE, echo=FALSE}
+knitr::kable(Bayes.out$summary, 
+             digits = 1,
+             caption = "Table 4. A comparison of six Bayesian closed models that were fitted to capture-recapture histories of green turtles in San Diego Bay during the abundance-estimation study in 2019.")
+
+```
+
+
+The closed model with the maximum likelihood approach provided the most precise estimate of abundance. (47.1, SE = 11.2, 95% CI = [33.9 - 82.2]).  
+
+During the early summer of 2017, we conducted a similar study to estimate the abundance.  The analysis of the data indicated the estimated abundance of 48 (SE = 7.03, 95% CI = [38.9 – 68.7]).  The two estimates of abundance are not statistically different. 
+
+#### Somatic growth
+Because our capture-recapture effort started in 1990, body size of captured turtles in the reporting period was examined in the context of the entire dataset. Missing CCL (cm) was predicted using the regression equation in Eguchi et al. (2010: CCL = 0.64 + 1.06SCL, n = 211, r^2^ = 0.99). 
+
+Curved carapace lengths of captured turtles during the reporting period ranged from ```r min(unique.new.captures.SDB$CCL, na.rm = T)``` cm to ```r max(unique.new.captures.SDB$CCL, na.rm = T)``` cm (mean = ```r signif(mean(unique.new.captures.SDB$CCL), 3)``` cm, SE = ```r signif(SE(unique.new.captures.SDB$CCL), 2)``` cm, n = ```r nrow(unique.new.captures.SDB)```, Table 1), whereas for the entire dataset, they ranged from ```r signif(min(turtle.haplo.SDB$CCL, na.rm = T), 2)``` cm to ```r signif(max(turtle.haplo.SDB$CCL, na.rm = T), 2)``` (mean = ```r signif(mean(turtle.haplo.SDB$CCL, na.rm = T), 3)``` cm, SE = ```r signif(SE(turtle.haplo.SDB$CCL), 3)``` cm, n = ```r nrow(turtle.haplo.SDB)```). 
+
+```{r change_SCL, echo=FALSE, warning=FALSE, fig.cap= "Figure 1. Changes in CCL (cm) of green turtles captured in San Diego Bay from 1990 to present. The current reporting period is shown as the shaded region. Lines connect the recaptured individuals."}
+estim.SCL <- filter(turtle.haplo.SDB, SCL.regress == 1)
+
+ggplot()  +
+  geom_path(data = turtle.haplo.SDB,
+            aes(x = Date, y = CCL, 
+                group = Turtle_ID)) + 
+  geom_point(data = turtle.haplo.SDB,
+             aes(x = Date, y = CCL)) +
+  geom_rect(aes(xmin = reporting.date.begin, 
+                xmax = reporting.date.end,
+                ymin = 40, ymax = 120), 
+            alpha = 0.6,
+            fill = "darkgray") +
+  ylab("CCL (cm)") + xlab("") + 
+  theme(axis.text = element_text(size = 12))
+
+
+  # geom_point(data = estim.CCL, 
+  #            aes(x = Date, y = SCL),
+  #            color = "red")
+
+```
+
+To investigate the change in size (CCL) of green turtles in SDB, we compared CCL of first captures of all turtles over the study period.  Distributions of CCL appeared to change over time, where the proportion of small individuals (< 75 cm CCL) increased over time (Figure 2). This may be a result of the increasing population.
+
+```{r change_size, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Figure 2. Changes in distribution of initial CCL (cm) of green turtles captured in San Diego Bay in 5-year segments from 1990 to present. Data points for each 5-year segment are shown as a rug plot."}
+turtle.haplo.SDB %>% mutate(Year.Group = if_else(year(Date) >= 2015, "2015-2019",
+                                                 if_else(year(Date) >=2010 & year(Date) <=2014, "2010-2014",
+                                                         if_else(year(Date) >=2005 & year(Date) <= 2009, "2005-2009",
+                                                                 if_else(year(Date) >=2000 & year(Date) <= 2004, "2000-2004", "1990-1999"))))) -> Clean_data2
+
+Clean_data2 %>% group_by(Turtle_ID) %>% 
+  summarize(firstCap = first(Date),
+            firstGroup = first(Year.Group),
+            firstCCL = first(CCL)) -> firstcap_only
+
+ggplot(data=firstcap_only, 
+       aes(x = firstCCL, y = firstGroup), na.rm =T)+
+  geom_density_ridges2(fill="forestgreen",
+                       jittered_points = T,
+                       position = position_points_jitter(height = 0),
+                       alpha = 0.5)+
+  labs(main="Change in size distribution", x="CCL(cm)", y="")
+
+```
+
+
+### Seal Beach National Wildlife Refuge
+During the reporting period, ```r length(unique(new.captures.SB$Date))``` field outings were made to the SBNWR between ```r min(new.captures.SB$Date)``` and ```r max(new.captures.SB$Date)```. A total of ```r nrow(new.captures.SB)``` green turtles were captured (Table 5). 
+
+Of the ```r nrow(new.captures.SB)``` interactions in the SBNWR with ```r length(unique(new.captures.SB$Turtle_ID))``` unique animals, ```r nrow(filter(unique.new.captures.SB, Sex == "F"))``` was classified as a female and the rest were classified as juveniles with unknown sex (Table 5), based upon the mean nesting size eastern Pacific green turtles.  Of the ```r length(unique(new.captures.SB$Turtle_ID))``` turtles,  ```r nrow(new.turtles.SB)``` were new animals not previously captured (Table 5).  
+
+```{r echo=FALSE}
+new.captures.SB %>% 
+  select(Turtle_ID, Date, Sex, Weight, CCL, SCL) %>%
+  arrange(by = Date) -> new.captures.SB.table
+knitr::kable(new.captures.SB.table, digits = 1,
+      caption = paste0("Table 5. Summary of green turtle interactions at SBNWR from ", 
+                       min(new.captures.SB$Date), " to ",  max(new.captures.SB$Date), "."))
+```
+
+#### Somatic growth
+Because our capture-recapture effort started in ```r min(year(turtle.haplo.SB$Date))```, body size of captured turtles in the reporting period was examined in the context of the entire dataset. Missing CCL (cm) was predicted using the regression equation in Eguchi et al. (2010: CCL = 0.64 + 1.06SCL, n = 211, r^2^ = 0.99). 
+
+Curved carapace lengths of captured turtles during the reporting period ranged from ```r min(unique.new.captures.SB$CCL, na.rm = T)``` cm to ```r max(unique.new.captures.SB$CCL, na.rm = T)``` cm (mean = ```r signif(mean(unique.new.captures.SB$CCL), 3)``` cm, SE = ```r signif(SE(unique.new.captures.SB$CCL), 2)``` cm, n = ```r nrow(unique.new.captures.SB)```.  For the entire dataset, they ranged from ```r signif(min(turtle.haplo.SB$CCL, na.rm = T), 3)``` to ```r signif(max(turtle.haplo.SB$CCL, na.rm = T), 3)``` (mean = ```r signif(mean(turtle.haplo.SB$CCL, na.rm = T), 3)``` cm, SE = ```r signif(SE(turtle.haplo.SB$CCL), 3)``` cm, n = ```r nrow(turtle.haplo.SB)```). 
+
+```{r Change_SCL_SB, echo=FALSE, warning=FALSE, echo=FALSE, warning=FALSE, fig.cap= "Figure 3. Changes in CCL (cm) of green turtles captured in Seal Beach National Wildlife Refuge from 2010 to present. The current reporting period is shown as the shaded region. Lines connect the recaptured individuals."}
+#estim.SCL.SB <- filter(turtle.haplo.SB, SCL.regress == 1)
+
+ggplot()  +
+  geom_path(data = turtle.haplo.SB,
+            aes(x = Date, y = CCL, 
+                group = Turtle_ID)) + 
+  geom_point(data = turtle.haplo.SB,
+             aes(x = Date, y = CCL)) +
+  geom_rect(aes(xmin = reporting.date.begin, 
+                xmax = reporting.date.end,
+                ymin = 40, ymax = 110), 
+            alpha = 0.6,
+            fill = "darkgray") +
+  ylab("CCL (cm)") + xlab("") + 
+  theme(axis.text = element_text(size = 12))
+
+
+  # geom_point(data = estim.CCL, 
+  #            aes(x = Date, y = SCL),
+  #            color = "red")
+
+```
+
+
+### Genetics
+Mitochondrial DNA sequencing is conducted on each individual turtle sampled from San Diego Bay.  Data analysis indicates that the animals are of Eastern Pacific origin with Islas Revillagigedos and Michoacan, Mexico contributing a majority of animals to the site (Dutton et al. 2019). 
+
+### Stable Isotopes
+Skin and blood samples for stable isotope analysis continue to be taken for long term monitoring and analysis. Currently, analyses of these samples are ongoing. Once analyses are completed, data will be compared to that of San Diego Bay, reported in Schumacher et al. (in prep).
+
+### Satellite Telemetry
+U.S. Navy is starting a military construction project in Anaheim Bay to restructure the Navy basin.  As part of biological monitoring for the construction, Navy has reached out the MTEAP to investigate movement patterns of green turtles in the area.  Our collaboration during the reporting period included deployments of X satellite telemetry transmitters on green turtles in the SBNWR.  A report for this study is found in the appendix. 
+
+
+## List titles of reports, publications, etc. resulting from this reporting period. 
+
+Banerjee SM, Allen CD, Schmitt T, Cheng BS, Seminoff JA, Eguchi T, Komoroske LM (Accepted) Baseline health parameters of east Pacific green turtles at Southern California foraging grounds. Chelonian Conservation and Biology.
+
+Barraza AD, Komoroske LM, Allen C, Eguchi T, Gossett R, Holland E, Lawson DD, LeRoux RA, Long A, Seminoff JA, Lowe CG (2019) Trace metals in green sea turtles (*Chelonia mydas*) inhabiting two southern California coastal estuaries. Chemosphere 223:342-350
+
+Dutton PH, LeRoux RA, LaCasella EL, Seminoff JA, Eguchi T, Dutton DL (2019) Genetic analysis and satellite tracking reveal origin of the green turtles in San Diego Bay. Marine Biology 166:3
+
+Eguchi T, Bredvik J, Graham S, LeRoux R, Saunders B, Seminoff JA (Accepted) Effects of a power plant closure on  home ranges of green turtles in an urban foraging area. Endangered Species Research
+
+
+# 2. Summarize how animals reacted to specific procedures. Include normal and abnormal responses of target and non-target animals. Where possible, provide quantitative data and estimate the proportion of animals (%) that had those reactions. 
+
+During the course of the permit period, we did not encounter any unusual problems or unforeseen effects on the animals or in our research efforts. The tagging and sampling methods are standard practice and no adverse reactions were observed. All interacted animals have had good vigor upon release and many have been recaptured at a later date indicating that the animals remain in the area (e.g. San Diego Bay) after capture. 
+
+The permitted activities appeared to have minimal effects on the animals. Most animals were calm after capture and during the sampling procedures. During capture, close attention is paid to the animals' activity to ensure that stress is minimized. A tarp was placed underneath the animal and box was used to contain the animal to prevent injuries.  A cool, wet cloth was used to wipe the carapace periodically to reduce the possibility of overheating.  During day time captures, an ez-up shade structure was used to provide shade to minimize exposure to the sun/heat.  Sampling events and transmitter applications did not produce any unforeseen responses.
+
+# 3. Explain your efforts to conduct follow-up monitoring. Report your findings.
+
+This is a long-term monitoring project and our field research occurs on an annual basis.  Recaptured animals are examined in order to determine any effects from previous sampling, tagging or transmitter deployments.  Upon recapture, all sampling sites have been healed and there is little evidence of a transmitter attachment once the device has been shed.  In addition, we photograph each of the animals to document injuries they may have sustained over time.  Inconel and PIT retention is good at our field site.  It is rare for us to encounter an animal that has lost a PIT tag.  
+
+# 4. Did serious injuries or mortalities occur or did you take a protected species you were not permitted to take? If so, and you already submitted an incident report, please briefly describe the event here and refer to the incident report.
+
+We did not have any instances during the season in which animals were unintentionally injured or killed.
+
+# 5. Describe any other problems encountered during this reporting period and steps taken or proposed to resolve them. Examples include equipment failure, weather delays, safety issues, and unanticipated effects to habitats or other species. 
+
+No problems were encountered.
+
+# 6. What efforts did you make to coordinate with the applicable NMFS Regional Office(s) and collaborate with other researchers? How did you collaborate (for example, avoiding field work at the same time or working together on the same animals, sharing vessels, sharing data)? 
+
+Phone calls were made to U.S. Fish & Wildlife and California Department of Fish and Game Agents 24 hours prior to research outings.  In addition, Navy was notified of the research outings and Navy biologists are often on hand to help during capture efforts. We provide Navy and the Westcoast Region information on green turtle movements and habitat use. 
+
+# Literature Cited:
+BURNHAM KP, ANDERSON DR 1998. Model selection and multimodel inference. Springer-Verlag
+
+COOCH E, WHITE G. Program MARK. Available from http://www.phidot.org  
+
+DUTTON DL, DUTTON PH. 1999. Accelerated growth in San Diego Bay green turtles?  Proceedings of the 17th Annual Symposium on Sea Turtle Biology and Conservation   NOAA Technical Memorandum NMFS-SEFSC-415:164-165.
+
+DUTTON PH, BALAZS GH, LEROUX RA, MURAKAWA SKK, ZARATE P, SARTI-MARTINEZ L. 2008. Genetic Composition of Hawaiian green turtle foraging aggregations: mtDNA evidence for a distinct regional population. Endangered Species Research 5:37-44.
+
+EGUCHI T, SEMINOFF JA, LEROUX RA, DUTTON PH, DUTTON DL. 2010. Abundance and survival rates of green turtles in an urban environment: coexistence of humans and an endangered species. Marine Biology 157:1869-1877.
+
+EGUCHI T, SEMINOFF JA, LEROUX RA, PROSPERI D, DUTTON DL, DUTTON PH. 2012. Morphology and growth rates of the green sea turtle (*Chelonia mydas*) in a northern-most temperate foraging ground. Herpetologica 68:76-87.
+
+GELMAN A, CARLI JB, STERN HS, DUNSON DB, VEHTARI A, RUBIN DB 2014. Bayesian data analysis. CRC Press
+Kéry M, Schaub M. 2012. Bayesian population analysis using WinBUGS. Academic Press
+
+LAAKE JL 2013. RMark: An R Interface for Analysis of Capture-Recapture Data with MARK. AFSC Processed Rep 2013-01, 25p. Alaska Fish. Sci. Cent., NOAA, Natl. Mar. Fish.  Serv., 7600 Sand Point Way NE, Seattle WA 98115.
+
+Plummer M 2016. rjags: Bayesian Graphical Models using MCMC. R package version 4-6. https://CRAN.R-project.org/package=rjags
+
+PLUMMER M 2017 JAGS. Available from http://mcmc-jags.sourceforge.net/ 
+
+ROYLE JA, DORAZIO RM 2008. Hierarchical modeling and inference in ecology. Academic Press
+
+SEMINOFF, J. A. 2000. The biology of the East Pacific green turtle (*Chelonia mydas agassizii*) at a warm temperate foraging area in the Gulf of California, Mexico. Ph. D. Dissertation. University of Arizona, Tucson. 248 pp.
+
+SEMINOFF JA, JONES TT, RESENDIZ A, NICHOLS WJ, CHALOUPKA MY. 2003. Monitoring green turtles (*Chelonia mydas*) at a coastal foraging area in Baja California, Mexico: multiple indices describe population status. Journal of Marine Biology 893:1335-1362.
+
+
+
