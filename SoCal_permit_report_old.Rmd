@@ -5,6 +5,11 @@ output: word_document
 
 ```{r setup, include=FALSE, echo=FALSE}
 rm(list=ls())
+source("SD_Bay_Report.R")
+source("SealBeach_Report.R")
+
+# THIS NEEDS TO BE FIXED 2020-10-06
+source("extract_data_TurtleDB.R")
 
 # bring in some results data files from Cm_SDB_CMR and Cm_SealBeach directories. 
 
@@ -20,7 +25,8 @@ library(ggridges)
 SE <- function(x) sqrt(var(x, na.rm = TRUE)/sum(!is.na(x)))
 # The date SD_Bay_Report.R and SealBeach_Report.R (in Cm_SealBeach directory) were run. They should be run
 # on the same day. 
-run.date <- "2019-10-08"
+run.date <- "2020-10-06"
+
 
 # SDB data
 col_def_SDB <- cols(Turtle_ID = col_integer(),
@@ -63,8 +69,8 @@ col_def_SB <- cols(Turtle_ID = col_integer(),
                    Sat_Max_Tag = col_integer(),
                    Haplo = col_factor())
 
-turtle.haplo.SB <- read_csv(file = paste0("~/R/Cm_SealBeach/data/SB_report_", 
-                                          run.date, ".csv"),
+turtle.haplo.SB <- read_csv(file = paste0("data/SB_report_", 
+                                         run.date, ".csv"),
                             col_types = col_def_SB)
 
 reporting.date.begin <- as.Date("2018-10-01")
@@ -178,7 +184,10 @@ All statistical analyses were conducted using the R Statistical Language (v.3.6.
 # BRING IN SIZE DATA FOR THE SAMPLING. SCL, CCL, ETC.
 # this file was created using extract_data_TurtleDB.R. See the script for 
 # details - connect to the database using ODBC
-dat.size <- read_csv(file = 'data/CMR2019_size_data_2019-09-23.csv')
+dat.size <- read_csv(file = paste0("data/CMR2019_size_data_", 
+                                   run.date, ".csv")) %>%
+  mutate(ID = Turtle_ID,
+         CCL_cm = Cur_Carapace_Length_cm)
 
 CH <- select(dat.size, -c("ID", "CCL_cm"))
 
