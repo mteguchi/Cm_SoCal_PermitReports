@@ -8,6 +8,7 @@ rm(list=ls())
 source("SD_Bay_Report.R")
 source("SealBeach_Report.R")
 
+
 # bring in some results data files from Cm_SDB_CMR and Cm_SealBeach directories. 
 
 knitr::opts_chunk$set(echo = TRUE)
@@ -24,50 +25,13 @@ SE <- function(x) sqrt(var(x, na.rm = TRUE)/sum(!is.na(x)))
 #run.date <- "2019-10-08"
 run.date <- "2020-10-06"
 
+
+
 # SDB data
-col_def_SDB <- cols(Turtle_ID = col_integer(),
-                    PIT_LFF = col_factor(),
-                    PIT_RFF = col_factor(),
-                    Tag_LFF = col_factor(),
-                    Tag_RFF = col_factor(),
-                    Date = col_date(format = "%Y-%m-%d"),
-                    Dead = col_integer(),
-                    Sex = col_factor(levels = c("F", "M", "U")),
-                    Weight = col_double(),
-                    SCL = col_double(),
-                    SCW = col_double(),
-                    CCL = col_double(),
-                    CCW = col_double(),
-                    Oxytet = col_double(),
-                    Blood = col_integer(),
-                    Skin = col_integer(),
-                    Haplo = col_factor())
 
-turtle.haplo.SDB <- read_csv(file = paste0("data/SDB_report_", run.date, ".csv"),
-                             col_types = col_def_SDB)
+turtle.haplo.SDB <- extract_SDB_data(run.date = run.date)
 
-col_def_SB <- cols(Turtle_ID = col_integer(),
-                   Date = col_date(format = "%Y-%m-%d"),
-                   PIT_LFF = col_factor(),
-                   PIT_RFF = col_factor(),
-                   Tag_LFF = col_factor(),
-                   Tag_RFF = col_factor(),
-                   Sex = col_factor(levels = c("F", "M", "U")),
-                   Weight = col_double(),
-                   SCL = col_double(),
-                   SCW = col_double(),
-                   CCL = col_double(),
-                   CCW = col_double(),
-                   Oxytet = col_double(),
-                   Blood = col_factor(),
-                   Skin = col_factor(),
-                   Sat_Tags = col_integer(),
-                   Sat_Max_Tag = col_integer(),
-                   Haplo = col_factor())
-
-turtle.haplo.SB <- read_csv(file = paste0("data/SB_report_", 
-                                          run.date, ".csv"),
-                            col_types = col_def_SB)
+turtle.haplo.SB <- extract_SB_data(run.date = run.date)
 
 reporting.date.begin <- as.Date("2019-10-01")
 reporting.date.end <- as.Date("2020-09-30")
@@ -273,7 +237,7 @@ Mitochondrial DNA sequencing is conducted on each individual turtle sampled from
 Skin and blood samples for stable isotope analysis continue to be taken for long term monitoring and analysis. Currently, analyses of these samples are ongoing. Once analyses are completed, data will be compared to that of San Diego Bay, reported in Schumacher et al. (in prep).
 
 ### Satellite Telemetry
-U.S. Navy is starting a military construction project in Anaheim Bay to restructure the Navy basin.  As part of biological monitoring for the construction, Navy has reached out the MTEAP to investigate movement patterns of green turtles in the area.  Our collaboration during the reporting period included deployments of X satellite telemetry transmitters on green turtles in the SBNWR.  A report for this study is found in the appendix. 
+U.S. Navy is starting a military construction project in Anaheim Bay to restructure the Navy basin.  As part of biological monitoring for the construction, Navy has reached out the MTEAP to investigate movement patterns of green turtles in the area.  Our collaboration during the reporting period included deployments of ```r sum(new.captures.SB$Sat_Tags, na.rm = T)``` satellite telemetry transmitters on green turtles in the SBNWR.  A report for this study is found in the appendix. 
 
 
 ## List titles of reports, publications, etc. resulting from this reporting period. 
