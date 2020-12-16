@@ -6,6 +6,7 @@ library(tidyverse)
 library(reshape2)
 
 # load a couple databases through ODBC
+# testing git
 
 turtle <- odbcConnect(dsn = 'Turtle', uid = '', pwd = '')
 
